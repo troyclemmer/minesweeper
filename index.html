@@ -1,1 +1,84 @@
-dasdasd
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-37853625-4"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'UA-37853625-4');
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta property="og:site_name" content="Minesweeper"/>
+<meta property="og:url" content="https://troyclemmer.github.io/minesweeper/">
+
+<link rel="image_src" href="res/images/minesweeper.png" / >
+
+<link rel="stylesheet" type="text/css" href="res/css/main.css?v=1"> 
+<!--<link rel="stylesheet" type="text/css" href="res/css/font-awesome.min.css">-->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.2/css/font-awesome.min.css" media="all" rel="stylesheet" type="text/css">
+<title>Minesweeper</title>
+</head>
+
+<body>
+
+
+<div class="container-fluid text-xs-center ms-container m-t-2">
+
+<hr>
+<div class="pull-left hidden-sm-down text-muted" style="margin-left:1rem; font-family:Oxygen; font-weight: 200; position: absolute; font-size: 1.5rem;">Minesweeper</div>
+<form class="form-inline">
+    <label class="options-label hidden-xs-down" for="widthInput">Width</label>
+    <input type="number" class="form-control options-input" id="widthInput" value="16" >
+    <label class="options-label m-l-2 hidden-xs-down" for="heightInput">Height</label>
+    <label class="hidden-sm-up">x</label>
+    <input type="number" class="form-control options-input" id="heightInput" value="16" >
+    <label class="options-label m-l-2r" for="bombInput"><span class="bomb-subtext" title="Ratio of safe spaces for every one bomb">(6.4 : 1)</span>Bombs</label>
+    <input type="number" class="form-control options-inputb" id="bombInput" value="40" >
+    <label id="difficulty-label" class="Intermediate m-l-2r">Intermediate</label>
+</form>
+<hr>
+
+<!-- oncontextmenu="return false;" -->
+<div class="minesweeper-container">
+<div id="board-outer-container" oncontextmenu="return false;"><div id="board-inner-container"><div id="board-innerinner-container">
+
+<div id="options-outer-container"><div id="options-inner-container"><div id="options-innerinner-container"><div id="options">
+  
+  <br>
+
+  <div style="position: relative; width: 0; height: 0">
+  <div id="bomb-led-box" class="led-box">888</div>
+  <div id="bombsRemainingDiv" class="led-box">000</div>
+    <div id="smiley-container">
+    <span class="fa-stack fa-lg smiley-box">
+    <i class="fa fa-sun-o fa-stack-2x hidden-important" style="color:yellow; top:-2px; left:-2.75px; font-size:1.8em; display:inline; aria-hidden=true"></i>
+       <i class="fa fa-circle fa-stack-2x" style="color:yellow; top:2px; font-size:1.5em; display:inline; aria-hidden=true"></i>
+       <i class="fa fa-smile-o fa-stack-2x " style="color:black;  top:2px; font-size:1.5em; display:inline; aria-hidden=true"></i>
+       </span>
+    </div>
+    <div id="timer-led-box" class="led-box">888</div>
+    <div id="timeSpentDiv" class="led-box">000</div>
+</div>
+
+<br><br>
+
+</div></div></div></div>
+
+<div id="board"></div></div></div></div>
+</div>
+
+</div>
+
+
+<div id="footer" class="m-t-3"></div>
+<script src="res/js/jquery.min.js"></script>
+<script src="res/js/bootstrap.min.js"></script>
+<script src="minesweeper.js?v=1"></script>
+</body>
+
+</html>

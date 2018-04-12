@@ -1,0 +1,624 @@
+var boardWidth=16;
+var boardHeight=16;
+var bombs=40;
+var freezeControls = false;
+var bombsRemaining;
+var spacesRemaining;
+var maxWidth = 99;
+var minWidth = 8;
+var minHeight = 1;
+var maxHeight = 99;
+var started;
+var timer;
+var lmb = false; //if left mouse button is currently active;
+var connectingZerosQueue;
+var paused = false;
+
+var main = function()
+{
+	SetupUniversalEventHandlers();
+	StartGame();
+}
+
+function SetupUniversalEventHandlers()
+{
+	$('.form-control').on('input', function() {
+
+		var w = $('#widthInput').val();
+		var h = $('#heightInput').val();
+		var b = $('#bombInput').val();
+
+	if (w < minWidth)
+	{
+		//$('#widthInput').val('');
+		w = minWidth;
+	}
+	if (w > maxWidth)
+	{
+		$('#widthInput').val(maxWidth);
+		w = maxWidth;
+	} 
+	if (h < minHeight)
+	{
+		//$('#heightInput').val('');
+		h = minHeight;
+	} 
+	if (h > maxHeight)
+	{
+		$('#heightInput').val(maxHeight);
+		h = maxHeight;
+	}
+	if (b < 0)
+	{
+		$('#bombInput').val(0);
+		b = 0;
+	}
+	if (b > w*h)
+	{
+		$('#bombInput').val(w*h);
+		b = w*h;
+	}
+	if (b > 999)
+	{
+		$('#bombInput').val(999);
+		b = 999
+	}
+
+    boardHeight = h;
+    boardWidth = w;
+    bombs = b;
+    SetDifficultyLabel();
+    StartGame();
+});
+
+	$(function() {
+  $(document).mouseup(function(event) {
+  	if (event.which===1)
+  	{
+  		lmb = false;
+    	$('.fa-meh-o').addClass("fa-smile-o");
+  		$('.fa-smile-o').removeClass("fa-meh-o");
+    }
+  });
+});
+
+	$(function() {
+  $(document).mousedown(function(event) {
+  	if (event.which===1)
+  	{
+  		lmb = true;
+    }
+  });
+});
+
+
+	$(function() {
+  $('.smiley-box').mousedown(function(event) {
+  	if (event.which===1)
+  	{
+  		$(this).addClass("smiley-box-pressed");
+  	}
+  });
+});	
+
+	$(function() {
+  $('.smiley-box').mouseup(function(event) {
+  	if (event.which===1)
+  	{
+  		$('.smiley-box').removeClass("smiley-box-pressed");
+  		StartGame();
+  	}
+  });
+});
+
+	$(function() {
+  $('.smiley-box').mouseleave(function() {
+  	if (event.which===1)
+  	{
+		$('.smiley-box').removeClass("smiley-box-pressed");
+  	}
+  });
+});
+
+	$(window).keydown(function (e) {
+  if (e.keyCode === 0 || e.keyCode === 32 || e.keyCode === 13) //enter and space
+  {
+    e.preventDefault();
+     $('.smiley-box').addClass("smiley-box-pressed");
+  }
+});
+
+	$(window).keyup(function (e) {
+  if (e.keyCode === 0 || e.keyCode === 32 || e.keyCode === 13)  //enter and space
+  {
+    e.preventDefault();
+     $('.smiley-box').removeClass("smiley-box-pressed");
+     if (!paused)
+     {
+  		StartGame();
+  	}
+  }
+  else if (e.keyCode === 80) //P
+  {
+  	e.preventDefault();
+  	TogglePause();
+  }
+});
+
+
+}
+
+function TogglePause()
+{
+	if (paused)
+	{
+		//unpause game
+		paused = false;
+  		freezeControls = false;
+  		started=true;
+  		$('.minesweeper-container').removeClass('pause');
+	}
+	else if (started)
+	{
+		//pause game
+		paused = true;
+  		freezeControls = true;
+  		started=false;
+  		$('.minesweeper-container').addClass('pause');
+	}
+}
+
+function SetDifficultyLabel()
+{
+	var d = $("#difficulty-label");
+	d.removeClass("firetextOUTLINE");
+	var difficultyLabel = "Intermediate";
+	var difficultyRating = (Math.round(((boardHeight*boardWidth-bombs)/bombs) * 10) / 10);
+	$(".bomb-subtext").text("("+difficultyRating+" : 1)");
+
+	if (boardHeight*boardWidth < 210) // if board is less than 210 squares area, add 0.1 for every 8 squares under (smaller boards are easier)
+	{
+		if (difficultyRating>0)
+		{
+			difficultyRating += ((210 - boardHeight*boardWidth)/8 * 0.1);
+		}
+	}
+
+	if (difficultyRating > 9.5)
+	{
+		difficultyLabel = "Beginner";
+	}
+	else if (difficultyRating < 4.5)
+	{
+		difficultyLabel = "Expert";
+		if (difficultyRating < 2.5)
+		{
+			d.addClass('firetextOUTLINE');
+			difficultyLabel = "Impossible";
+		}
+	}
+
+	
+	d.removeClass("Beginner");
+	d.removeClass("Intermediate");
+	d.removeClass("Expert");
+	d.removeClass("Impossible");
+	d.addClass(difficultyLabel);
+	d.text(difficultyLabel);
+}
+
+function StartGame()
+{
+	connectingZerosQueue = [];
+	$('.fa-sun-o').addClass("hidden-important");
+	started = false;
+	clearInterval(timer);
+	freezeControls = false;
+
+	//boardHeight = $('#heightInput').val();
+    //boardWidth = $('#widthInput').val();
+    //bombs = $('#bombInput').val();
+
+	bombsRemaining = bombs;
+	spacesRemaining = boardWidth * boardHeight - bombsRemaining;
+
+	UpdateDisplays();
+	$("#timeSpentDiv").text("000");
+
+	$(".fa-frown-o").addClass("fa-smile-o");
+	$(".fa-smile-o").removeClass("fa-frown-o");
+
+	DrawBoard();
+	SetBombs();
+	SetupBoardValues(); 
+	AttachElementHandlers();
+}
+
+function DrawBoard()
+{
+	var rightAmtClock = boardWidth*32-62-16;
+	$('#timeSpentDiv').css('margin-left',rightAmtClock);
+	$('#timer-led-box').css('margin-left',rightAmtClock);
+	var rightAmtSmiley = -1*((boardWidth/2)*32+21.5);
+	$('#smiley-container').css('right',rightAmtSmiley);
+	$('#board').html('');
+	for(var row = 1; row <= boardHeight; row++)
+	{
+		for(var column = 1; column <= boardWidth; column++)
+		{
+
+			var $newCell = $('<div>') // creates a div element
+				 .attr("class", "board-cell")
+                 .attr("id", "row"+row+"col"+column);  // adds the id
+
+
+		$newCell.appendTo('#board');
+
+		}
+		$('<br>').appendTo('#board');
+	}
+}
+
+function SetBombs()
+{
+	var bombsSet = 0;
+
+	while (bombsSet < bombs)
+	{
+		var row = Math.floor((Math.random() * boardHeight) + 1);
+		var col = Math.floor((Math.random() * boardWidth) + 1);
+		var cell = $("#row"+row+"col"+col);
+
+		if (!cell.hasClass("bomb"))
+		{
+			cell.addClass("bomb");
+			bombsSet++;
+		}
+
+	}
+}
+
+function SetupBoardValues()
+{
+	for(var row = 1; row <= boardHeight; row++)
+	{
+		for(var column = 1; column <= boardWidth; column++)
+		{
+			var cell = $("#row"+row+"col"+column);
+
+			if (!cell.hasClass("bomb"))
+			{
+				var cellValue = 0;
+
+				//need to test the 8 adjacent cells for bombs
+				if($("#row"+(row+1)+"col"+(column+1)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row-1)+"col"+(column-1)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row+1)+"col"+(column+0)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row+0)+"col"+(column+1)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row-1)+"col"+(column+0)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row+0)+"col"+(column-1)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row+1)+"col"+(column-1)).hasClass("bomb")) { cellValue++; }
+				if($("#row"+(row-1)+"col"+(column+1)).hasClass("bomb")) { cellValue++; }
+
+
+				var cellValueClass = "eight";
+				if (cellValue===0)
+				{
+					cellValueClass="zero";
+				}
+				else if (cellValue===1)
+				{
+					cellValueClass="one";
+				}
+				else if (cellValue===2)
+				{
+					cellValueClass="two";
+				}
+				else if (cellValue===3)
+				{
+					cellValueClass="three";
+				}
+				else if (cellValue===4)
+				{
+					cellValueClass="four";
+				} 
+				else if (cellValue===5)
+				{
+					cellValueClass="five";
+				} 
+				else if (cellValue===6)
+				{
+					cellValueClass="six";
+				} 
+				else if (cellValue===7)
+				{
+					cellValueClass="seven";
+				} 
+				cell.addClass(cellValueClass);
+			}
+		}
+	}
+}
+
+function AttachElementHandlers()
+{
+	$(function() {
+  $('.board-cell').mousedown(function(event) {
+    
+    if (!freezeControls && !$(this).hasClass("exposed"))
+  	{
+    	switch (event.which) 
+    	{
+    		//left click
+    	    case 1:
+    	        
+    	        if (!$(this).hasClass("flag") && !$(this).hasClass("questionmark"))
+    	        {
+    	        	$(this).addClass("pressed");
+  					$('.fa-smile-o').addClass("fa-meh-o");
+    	        	$('.fa-meh-o').removeClass("fa-smile-o");
+				}
+    	        break;
+
+    	    //middle click
+    	    case 2:
+    	        break;
+
+    	    //right click
+    	    case 3:
+    	    if ($(this).hasClass("flag"))
+    	    	{
+    	    		bombsRemaining++;
+    	    		UpdateDisplays();
+    	    		$(this).removeClass("flag");
+    	    		$(this).addClass('questionmark');
+    	    	}
+    	    	else if ($(this).hasClass("questionmark"))
+    	    	{
+    	    		$(this).removeClass("questionmark");
+    	    	}
+    	    	else
+    	    	{
+    	    		bombsRemaining--;
+    	    		UpdateDisplays();
+    	    		$(this).addClass('flag');
+    	    		if (bombsRemaining===0 && spacesRemaining===0)
+					{
+						YouWin();
+					}
+    	    	}
+    	        break;
+
+    	    default:
+    	    	break;
+    	}
+	}
+
+  });
+});	
+
+
+	$(function() {
+  $('.board-cell').mouseup(function(event) {
+    
+    if (!freezeControls && !$(this).hasClass("exposed"))
+  	{
+    	switch (event.which) 
+    	{
+    		//left click
+    	    case 1:
+    	        if (!$(this).hasClass("flag") && !$(this).hasClass("questionmark"))
+    	        {
+    	        	if (!started)
+    	        	{
+    	        		started = true;
+    	        		StartTimer();
+    	        	}
+    	        	$(this).removeClass("pressed");
+    	        	$('.fa-meh-o').addClass("fa-smile-o");
+  					$('.fa-smile-o').removeClass("fa-meh-o");
+    	    		ExposeCell($(this));
+				}
+    	        break;
+
+    	    //middle click
+    	    case 2:
+    	        break;
+
+    	    //right click
+    	    case 3:
+    	        break;
+
+    	    default:
+    	    	break;
+    	}
+	}
+
+  });
+});	
+
+
+$(function() {
+  $('.board-cell').mouseleave(function() {
+  	$(this).removeClass("pressed");
+  });
+});
+
+$(function() {
+  $('.board-cell').mouseenter(function() {
+  	if (lmb)
+  	{
+  		$(this).addClass("pressed");
+  	}
+  });
+});
+
+
+}
+
+function ExposeCell(cell)
+{
+	if (cell != null && !cell.hasClass("exposed"))
+	{
+		ExposeCellDetails(cell);
+	
+		if (cell.hasClass("bomb") && freezeControls === false)
+    	{
+    		cell.attr("style", "background-color:red;");
+    		YouLose();	
+    	}
+    	else if (cell.hasClass("zero"))
+    	{
+    		RevealConnectingZeros(cell);
+    		while (connectingZerosQueue.length > 0)
+    		{
+    			var connectedCell = connectingZerosQueue.shift();
+    			if (!connectedCell.hasClass("exposed"))
+    			{
+    				ExposeCellDetails(connectedCell);
+    				if (connectedCell.hasClass("zero"))
+    				{
+    					RevealConnectingZeros(connectedCell);
+    				}
+    			}
+    		}
+    	}
+
+    	spacesRemaining = boardWidth * boardHeight - bombs - $('.exposed').length;
+
+    	if (bombsRemaining===0 && spacesRemaining===0 && freezeControls == false)
+		{
+			YouWin();
+		}
+	}
+}
+
+function ExposeCellDetails(cell)
+{
+	cell.addClass("exposed");
+	if(cell.hasClass("flag"))
+	{
+		cell.removeClass("flag");
+		bombsRemaining++;
+		UpdateDisplays();
+	}
+	cell.removeClass("questionmark");
+}
+
+
+//function RevealConnectingZeros(row_s, col_s)
+//{
+//	var row = parseInt(row_s);
+//	var col = parseInt(col_s);
+//
+//
+//	ExposeCell($("#row"+(row-1)+"col"+(col+0)));
+//	ExposeCell($("#row"+(row+1)+"col"+(col+0)));
+//	ExposeCell($("#row"+(row+0)+"col"+(col-1)));
+//	ExposeCell($("#row"+(row+0)+"col"+(col+1)));
+//	ExposeCell($("#row"+(row+1)+"col"+(col+1)));
+//	ExposeCell($("#row"+(row-1)+"col"+(col-1)));
+//	ExposeCell($("#row"+(row+1)+"col"+(col-1)));
+//	ExposeCell($("#row"+(row-1)+"col"+(col+1)));
+//}
+
+function RevealConnectingZeros(cell)
+{
+	var idstring = cell.attr('id');
+    var row = parseInt(idstring.split("row")[1].split("col")[0]);
+    var col = parseInt(idstring.split("col")[1]);
+
+	connectingZerosQueue.push($("#row"+(row-1)+"col"+(col+0)));
+	connectingZerosQueue.push($("#row"+(row+1)+"col"+(col+0)));
+	connectingZerosQueue.push($("#row"+(row+0)+"col"+(col-1)));
+	connectingZerosQueue.push($("#row"+(row+0)+"col"+(col+1)));
+	connectingZerosQueue.push($("#row"+(row+1)+"col"+(col+1)));
+	connectingZerosQueue.push($("#row"+(row-1)+"col"+(col-1)));
+	connectingZerosQueue.push($("#row"+(row+1)+"col"+(col-1)));
+	connectingZerosQueue.push($("#row"+(row-1)+"col"+(col+1)));
+}
+
+function YouWin()
+{
+	$('.fa-sun-o').removeClass("hidden-important");
+	started = false;
+	freezeControls = true;
+	//window.setTimeout(function() { alert("You win!"); }, 400); 
+}
+
+function YouLose()
+{
+	started = false;
+	freezeControls = true;
+
+	$('.bomb').each(function(i, obj) {
+		if (!$(this).hasClass("flag"))
+		{
+    		ExposeCell($(this));
+		}
+	});
+
+	$('.flag').each(function(i, obj) {
+		if (!$(this).hasClass("bomb"))
+		{
+			$(this).removeClass("flag");
+			$(this).addClass("bombWrong");
+		}
+	});
+
+	$(".fa-smile-o").addClass("fa-frown-o");
+	$(".fa-meh-o").addClass("fa-frown-o");
+	$(".fa-frown-o").removeClass("fa-smile-o");
+	$(".fa-frown-o").removeClass("fa-meh-o");
+	//window.setTimeout(function() { alert("You blew up!"); }, 500); 
+}
+
+function UpdateDisplays()
+{
+	var bombdisplay = bombsRemaining;
+	while(bombdisplay.toString().length < 3)
+	{
+		bombdisplay = "0"+bombdisplay;
+	}
+	if (bombdisplay.toString().length <= 3) //only update display if <= 3 characters so you cant get it to -100 and cheese the display
+	{
+		$("#bombsRemainingDiv").text(bombdisplay);
+	}
+}
+
+function ExposeBoard()
+{
+	freezeControls = true;
+	$('.board-cell').each(function(i, obj) {
+    ExposeCell($(this));
+	});
+}
+
+function StartTimer()
+{
+	timer = setInterval(function() {TimerTick();}, 1000);
+}
+
+
+function TimerTick()
+{
+	if (started)
+	{
+		var time = $('#timeSpentDiv').text();
+		time = parseInt(time);
+		if (time < 999)
+		{
+			time++;
+		
+			while(time.toString().length < 3)
+			{
+				time = "0"+time;
+			}
+			$("#timeSpentDiv").text(time);
+		}
+	}
+}
+
+$(window).load();
+
+$(document).ready(main);
